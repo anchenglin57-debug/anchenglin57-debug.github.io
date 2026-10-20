@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交互设计视角 · 模拟器体验再分析</title>
+<style>
+  :root{
+    --paper:#faf8f5; --card:#ffffff; --ink:#1f2430; --ink2:#4b5563; --muted:#8b93a1;
+    --accent:#c2452d; --accent-soft:#f9ece8; --indigo:#2f3e63; --indigo-soft:#edf0f7;
+    --line:#e7e2d8; --ok:#2e7d5b; --ok-soft:#eaf4ef; --warn:#b3541e; --warn-soft:#faf0e6;
+    --sans:system-ui,-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:15px;line-height:1.85}
+
+  /* 阅读进度条 */
+  .progress{position:fixed;top:0;left:0;height:3px;width:0;background:linear-gradient(90deg,var(--accent),var(--indigo));z-index:300;transition:width .1s linear}
+
+  /* 顶栏 */
+  .site-head{position:sticky;top:0;z-index:200;background:rgba(250,248,245,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 28px;height:58px}
+  .site-head .mark{width:30px;height:30px;border-radius:8px;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;letter-spacing:.5px}
+  .site-head .t{font-weight:700;font-size:15px}
+  .site-head .t small{color:var(--muted);font-weight:400;margin-left:8px;font-size:12px}
+  .site-head .jump{margin-left:auto;font-size:12px;color:var(--muted)}
+  .site-head .jump a{color:var(--ink2);text-decoration:none;margin-left:14px}
+  .site-head .jump a:hover{color:var(--accent)}
+
+  /* 布局 */
+  .page{display:flex;justify-content:center}
+  .doc{width:100%;max-width:860px;padding:0 26px 100px}
+  .toc{position:fixed;top:100px;right:max(24px, calc(50vw - 680px));width:190px;font-size:12.5px;display:none}
+  @media(min-width:1360px){.toc{display:block}}
+  .toc .toc-h{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1.5px;margin:16px 0 6px}
+  .toc a{display:block;color:var(--ink2);text-decoration:none;padding:3px 0 3px 12px;border-left:2px solid transparent;line-height:1.5}
+  .toc a:hover{color:var(--accent)}
+  .toc a.on{color:var(--accent);border-left-color:var(--accent);font-weight:600}
+  .toc a.sub{padding-left:24px;font-size:12px;color:var(--muted)}
+
+  /* 区块 */
+  .sec{padding-top:74px}
+  .sec-no{display:inline-block;font-size:12px;font-weight:700;color:var(--accent);letter-spacing:2px;margin-bottom:10px}
+  .sec h2{font-size:26px;font-weight:800;line-height:1.4;margin-bottom:14px;letter-spacing:.5px}
+  .sec-lead{color:var(--ink2);font-size:15px;margin-bottom:26px}
+  .sec h3{font-size:19px;font-weight:700;margin:34px 0 12px}
+  .sec p{margin:13px 0}
+  .sec ul,.sec ol{margin:13px 0;padding-left:24px}
+  .sec li{margin:7px 0}
+  .sec strong{color:var(--accent)}
+  .sec em{font-style:normal;background:linear-gradient(transparent 62%,#f5d9d1 62%);padding:0 2px}
+
+  /* Hero */
+  .hero{padding-top:72px}
+  .hero .kicker{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--accent);background:var(--accent-soft);padding:5px 14px;border-radius:99px;margin-bottom:22px}
+  .hero .kicker::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  .hero h1{font-size:40px;font-weight:800;line-height:1.28;letter-spacing:1px;margin-bottom:8px}
+  .hero h1 span{color:var(--accent)}
+  .hero .sub{font-size:17px;color:var(--ink2);margin:16px 0 30px;max-width:680px}
+  .hero .meta{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:36px}
+  .hero .meta span{font-size:12px;color:var(--ink2);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:4px 12px}
+  .viewnote{background:var(--indigo-soft);border-left:4px solid var(--indigo);border-radius:0 10px 10px 0;padding:18px 22px;margin:28px 0}
+  .viewnote b{color:var(--indigo)}
+  .viewnote p{margin:4px 0}
+
+  /* 五维卡片 */
+  .dims{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:26px 0}
+  .dim{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 18px 16px;position:relative}
+  .dim::before{content:"";position:absolute;top:0;left:18px;right:18px;height:3px;border-radius:0 0 3px 3px;background:var(--accent)}
+  .dim:nth-child(2)::before{background:#d97b3f}.dim:nth-child(3)::before{background:#c8a23a}.dim:nth-child(4)::before{background:#6b8f3f}.dim:nth-child(5)::before{background:var(--indigo)}
+  .dim .no{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1.5px}
+  .dim h4{font-size:15.5px;margin:4px 0 8px}
+  .dim p{font-size:13px;color:var(--ink2);margin:0;line-height:1.7}
+
+  /* 图表通用 */
+  .chart-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px 26px;margin:26px 0}
+  .chart-card h4{font-size:15.5px;margin-bottom:4px}
+  .chart-card .cap{font-size:12.5px;color:var(--muted);margin-bottom:18px}
+  .lat-row{display:grid;grid-template-columns:220px 1fr 150px;align-items:center;gap:12px;padding:7px 0}
+  .lat-row .lb{font-size:13px;text-align:right;color:var(--ink2)}
+  .lat-row .tk{height:18px;border-radius:4px;background:var(--paper);border:1px solid var(--line);overflow:hidden}
+  .lat-row .fl{height:100%;border-radius:3px}
+  .lat-row .vl{font-size:12.5px;color:var(--ink2)}
+  @media(max-width:640px){.lat-row{grid-template-columns:130px 1fr};.lat-row .vl{display:none}}
+
+  /* 注意力光谱 */
+  .spec{position:relative;margin:38px 4px 10px;padding:0 6px}
+  .spec::before{content:"";position:absolute;left:0;right:0;top:7px;height:2px;background:linear-gradient(90deg,var(--indigo),var(--accent))}
+  .spec-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;position:relative}
+  .spec-node{padding-top:26px;position:relative}
+  .spec-node::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:16px;height:16px;border-radius:50%;background:#fff;border:4px solid var(--indigo)}
+  .spec-node.hot::before{border-color:var(--accent)}
+  .spec-node b{display:block;font-size:13px;text-align:center}
+  .spec-node i{display:block;font-style:normal;font-size:11px;color:var(--muted);text-align:center;line-height:1.5;margin-top:4px}
+  .spec-axes{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink2);margin-top:18px;padding:0 4px}
+  .spec-axes b{color:var(--indigo)} .spec-axes b:last-child{color:var(--accent)}
+  @media(max-width:640px){.spec-grid{grid-template-columns:1fr 1fr}.spec::before{display:none}.spec-node::before{display:none}.spec-node{padding-top:0}}
+
+  /* 工具块 */
+  .tool{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:30px 32px;margin:22px 0;scroll-margin-top:80px}
+  .tool-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:4px}
+  .tool-no{font-size:11.5px;font-weight:700;color:var(--accent);letter-spacing:1.5px}
+  .tool-head h3{font-size:21px;margin:0}
+  .tool-tag{font-size:11.5px;color:var(--indigo);background:var(--indigo-soft);border-radius:5px;padding:2px 9px;font-weight:600}
+  .verdict{font-size:16.5px;font-weight:700;color:var(--accent);margin:10px 0 6px}
+  .tool h4{font-size:14px;color:var(--muted);font-weight:700;letter-spacing:1px;margin:20px 0 8px}
+  .tool ul{margin:6px 0}
+  .tool ul li{margin:9px 0}
+  .tool ul li b{color:var(--ink)}
+  .scores{background:var(--paper);border-radius:10px;padding:16px 18px;margin:18px 0 6px}
+  .sb{display:grid;grid-template-columns:96px 1fr 40px;align-items:center;gap:10px;padding:4px 0}
+  .sb .n{font-size:12.5px;color:var(--ink2)}
+  .sb .tk{height:9px;border-radius:5px;background:var(--line);overflow:hidden}
+  .sb .fl{height:100%;border-radius:5px;background:var(--indigo)}
+  .sb.hot .fl{background:var(--accent)}
+  .sb .v{font-size:12.5px;color:var(--ink2);text-align:right}
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0 6px}
+  @media(max-width:640px){.duo{grid-template-columns:1fr}}
+  .pane{border-radius:10px;padding:14px 18px;font-size:13.5px}
+  .pane h5{font-size:13px;margin-bottom:8px;letter-spacing:.5px}
+  .pane ul{padding-left:18px;margin:0}
+  .pane li{margin:6px 0}
+  .pane.good{background:var(--ok-soft)} .pane.good h5{color:var(--ok)}
+  .pane.bad{background:var(--warn-soft)} .pane.bad h5{color:var(--warn)}
+  .rx{border:1.5px dashed var(--accent);border-radius:10px;padding:14px 18px;margin-top:18px;font-size:13.5px}
+  .rx b{color:var(--accent)}
+
+  /* 表格 */
+  .tw{overflow-x:auto;margin:20px 0;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{background:#f3f0ea;text-align:left;padding:10px 14px;font-weight:700;color:var(--indigo);border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#fdfcf9}
+  td .dots{letter-spacing:2px;color:var(--accent)}
+  td .dots i{font-style:normal;color:#d5cec2}
+
+  /* 引言块 / 结论卡 */
+  .pull{border-left:4px solid var(--accent);background:var(--card);border-radius:0 10px 10px 0;padding:16px 22px;margin:22px 0;font-size:15.5px;font-weight:600}
+  .callout{background:var(--accent-soft);border-radius:10px;padding:16px 20px;margin:20px 0;font-size:14px}
+  .callout b{color:var(--accent)}
+
+  /* Q&A 区块头 */
+  .qa{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:30px 32px;margin:20px 0}
+  .qa .qtag{display:inline-block;font-size:11.5px;font-weight:700;color:#fff;background:var(--accent);border-radius:5px;padding:2px 10px;margin-bottom:12px;letter-spacing:1px}
+  .qa .q{font-size:17px;font-weight:700;line-height:1.6;margin-bottom:6px}
+  .qa .a-label{font-size:12px;color:var(--muted);font-weight:700;letter-spacing:1.5px;margin:16px 0 4px}
+  .qa h4{font-size:15px;margin:18px 0 8px;color:var(--indigo)}
+
+  /* 七功能闭环图 */
+  .loop-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:22px 0}
+  @media(max-width:640px){.loop-grid{grid-template-columns:1fr}}
+  .lg{border-radius:12px;padding:16px 18px;border:1px solid var(--line);background:var(--card)}
+  .lg b{display:block;font-size:14px;margin-bottom:6px}
+  .lg span{font-size:12.5px;color:var(--muted)}
+  .lg.c1{background:var(--indigo-soft);border-color:transparent}.lg.c1 b{color:var(--indigo)}
+  .lg.c2{background:#eaf4ef;border-color:transparent}.lg.c2 b{color:var(--ok)}
+  .lg.c3{background:#faf0e6;border-color:transparent}.lg.c3 b{color:var(--warn)}
+  .lg.c4{background:var(--accent-soft);border-color:transparent}.lg.c4 b{color:var(--accent)}
+
+  /* 宣言 */
+  .creed{counter-reset:cd;margin:20px 0}
+  .creed li{list-style:none;position:relative;padding:13px 0 13px 58px;border-bottom:1px dashed var(--line);font-size:15px;font-weight:600}
+  .creed li::before{counter-increment:cd;content:counter(cd,decimal-leading-zero);position:absolute;left:0;top:12px;font-size:20px;font-weight:800;color:var(--accent);opacity:.85}
+  .creed li small{display:block;font-weight:400;font-size:13px;color:var(--ink2);margin-top:3px}
+
+  footer{margin-top:80px;padding-top:26px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .to-top{position:fixed;right:26px;bottom:26px;width:42px;height:42px;border-radius:50%;background:var(--ink);color:#fff;border:none;font-size:16px;cursor:pointer;opacity:0;pointer-events:none;transition:.25s;z-index:150}
+  .to-top.show{opacity:.92;pointer-events:auto}
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+
+<header class="site-head">
+  <div class="mark">IxD</div>
+  <div class="t">交互设计视角 · 模拟器体验再分析<small>Simulator Experience, Redesigned Lens</small></div>
+  <nav class="jump">
+    <a href="#framework">框架</a><a href="#tools">工具解读</a><a href="#q1">五问再答</a><a href="#manifesto">设计宣言</a>
+  </nav>
+</header>
+
+<div class="page">
+<nav class="toc" id="toc"></nav>
+<main class="doc">
+
+  <!-- ============ HERO ============ -->
+  <section class="hero" id="overview">
+    <span class="kicker">换一双眼睛，重新看一遍</span>
+    <h1>模拟器不是一台虚拟设备，<br>是一条<span>反馈回路</span>。</h1>
+    <p class="sub">上一轮分析用工程视角回答"这些模拟器是什么、怎么实现"。这一轮，我以交互设计师的身份，只关心一件事：<b>开发者在这些工具里的体验，是如何被设计的。</b></p>
+    <div class="meta">
+      <span>分析对象 · 六类工具</span><span>评估维度 · 五项</span><span>再答问题 · 五问</span><span>2026-10-20</span>
+    </div>
+    <div class="viewnote">
+      <p><b>视角声明：</b>本页与《六类模拟器方案深度分析》（工程视角，见 index.html）互为补充。工程视角回答"哪种技术形态更好"，交互视角回答"哪种体验更好"——两个答案不完全一致，而这个分歧本身就是本报告最重要的发现。</p>
+    </div>
+  </section>
+
+  <!-- ============ 框架 ============ -->
+  <section class="sec" id="framework">
+    <span class="sec-no">01</span>
+    <h2>评估框架：交互设计师的五把尺子</h2>
+    <p class="sec-lead">不看技术架构，只量体验。每个工具的每个设计决策，都会被放到这五把尺子上重新测量。</p>
+    <div class="dims">
+      <div class="dim"><span class="no">DIM 01</span><h4>反馈回路</h4><p>从"改一行代码"到"看到结果"要多久、多确定。开发工具体验的第一性问题——所有模拟器设计本质上都在优化这条回路。</p></div>
+      <div class="dim"><span class="no">DIM 02</span><h4>注意力</h4><p>验证发生在心流的哪一层：屏内面板、紧凑浮窗、独立窗口，还是物理世界？每换一层，都有一次注意力恢复成本。</p></div>
+      <div class="dim"><span class="no">DIM 03</span><h4>直接操纵</h4><p>拖拽、缩放、点哪改哪，还是菜单、下拉、配置文件？操纵的对象离用户的意图越近，翻译损耗越小。</p></div>
+      <div class="dim"><span class="no">DIM 04</span><h4>心智模型</h4><p>工具给出的隐喻——"一台设备""一面画布""一个工作区"——是否与开发者任务时脑中的模型一致？隐喻错位，学习成本永远还不完。</p></div>
+      <div class="dim"><span class="no">DIM 05</span><h4>认知负荷</h4><p>完成一次多设备验证要点多少次、记多少事、配多少参数？好的设计让"多设备验证"是一个动作，而不是一个项目。</p></div>
+    </div>
+    <div class="callout"><b>方法论说明：</b>下文所有评分为设计视角的主观量化（5 分制），依据是各工具公开文档与演示中可观察的交互行为，用于横向比较，不代表客观基准。</div>
+  </section>
+
+  <!-- ============ 反馈回路图 ============ -->
+  <section class="sec" id="loops">
+    <span class="sec-no">02</span>
+    <h2>第一把尺子先量所有人：反馈回路延迟对比</h2>
+    <p class="sec-lead">把六类工具放进同一张时间轴上，"改代码 → 看到结果"的典型耗时（示意，非线性比例）：</p>
+    <div class="chart-card">
+      <h4>反馈回路延迟光谱</h4>
+      <div class="cap">横条越短，验证回路越快。颜色按形态分组。</div>
+      <div class="lat-row"><div class="lb">Claude Code 自动验证</div><div class="tk"><div class="fl" style="width:5%;background:var(--ok)"></div></div><div class="vl">编辑后自动·后台</div></div>
+      <div class="lat-row"><div class="lb">DevEco Previewer 热重载</div><div class="tk"><div class="fl" style="width:8%;background:#6b8f3f"></div></div><div class="vl">≈ 1–3 秒</div></div>
+      <div class="lat-row"><div class="lb">鸿蒙电脑公测版（原生运行）</div><div class="tk"><div class="fl" style="width:11%;background:var(--indigo)"></div></div><div class="vl">秒级·多窗同步刷新</div></div>
+      <div class="lat-row"><div class="lb">微信开发者工具</div><div class="tk"><div class="fl" style="width:16%;background:#c8a23a"></div></div><div class="vl">≈ 3–10 秒（重编译）</div></div>
+      <div class="lat-row"><div class="lb">Xcode 构建运行至 Device Hub</div><div class="tk"><div class="fl" style="width:32%;background:var(--accent)"></div></div><div class="vl">≈ 10–40 秒</div></div>
+      <div class="lat-row"><div class="lb">Android Studio（Gradle + 安装）</div><div class="tk"><div class="fl" style="width:50%;background:#d97b3f"></div></div><div class="vl">≈ 30 秒 – 数分钟</div></div>
+      <div class="lat-row"><div class="lb">本地模拟器冷启动（A 形态）</div><div class="tk"><div class="fl" style="width:68%;background:#a0522d"></div></div><div class="vl">分钟级（镜像加载）</div></div>
+      <div class="lat-row"><div class="lb">真机插线部署</div><div class="tk"><div class="fl" style="width:84%;background:#7a3b28"></div></div><div class="vl">分钟级 + 物理操作</div></div>
+    </div>
+    <p>三个设计观察：</p>
+    <ul>
+      <li><b>回路的两个极端都不是"模拟器"。</b>最快的是"不模拟"（原生执行）和"不等人"（代理自动验证）——这预示了模拟器体验的两个进化方向：底座原生化、回路后台化。</li>
+      <li><b>中间段的差距主要不是渲染速度，是构建链路。</b>Device Hub 与 Android Studio 的延迟差异来自工具链设计，而非模拟器本身——交互设计师能优化的空间恰恰在这里（见后文"等待对齐"原则）。</li>
+      <li><b>Claude Code 的位置最特别：回路还在，但用户不在回路上。</b>验证从主动动作变成背景服务，这是反馈回路设计的终极形态。</li>
+    </ul>
+  </section>
+
+  <!-- ============ 注意力光谱 ============ -->
+  <section class="sec" id="attention">
+    <span class="sec-no">03</span>
+    <h2>第二把尺子：验证发生在注意力的哪一层</h2>
+    <p class="sec-lead">每类工具把"看结果"这件事放在了不同的物理与心理位置：</p>
+    <div class="chart-card">
+      <h4>注意力光谱</h4>
+      <div class="cap">从左到右：离代码越来越远，离设备任务越来越近。</div>
+      <div class="spec">
+        <div class="spec-grid">
+          <div class="spec-node"><b>屏内面板</b><i>Android Studio 工具窗<br>微信模拟器</i></div>
+          <div class="spec-node"><b>紧凑浮窗</b><i>Device Hub 紧凑窗</i></div>
+          <div class="spec-node"><b>独立窗口</b><i>DevEco 副屏独立窗<br>公测版多窗口</i></div>
+          <div class="spec-node hot"><b>独立应用</b><i>Device Hub 扩展窗</i></div>
+          <div class="spec-node"><b>物理世界</b><i>真机 · 扫码预览</i></div>
+        </div>
+        <div class="spec-axes"><b>← 上下文连续性高 · 任务带宽低</b><b>上下文连续性低 · 任务带宽高 →</b></div>
+      </div>
+    </div>
+    <ul>
+      <li><b>光谱两端各有代价：</b>太靠左（嵌入），设备内容被压缩到看不清，还与代码争空间；太靠右（独立应用/真机），换窗口的成本每分钟都在支付。</li>
+      <li><b>Device Hub 的双模式本质是"在光谱上滑动"：</b>运行时在紧凑浮窗（靠左，不打断编码），管理时展开独立应用（靠右，全带宽工作）。这是对注意力任务匹配度最好的现存设计。</li>
+      <li><b>鸿蒙电脑公测版的多窗口停在光谱中段：</b>比嵌入自由，但既没有浮窗的轻，也没有中枢的全——位置对了，层级没分级。</li>
+    </ul>
+  </section>
+
+  <!-- ============ 工具解读 ============ -->
+  <section class="sec" id="tools">
+    <span class="sec-no">04</span>
+    <h2>六类工具的交互设计解读</h2>
+    <p class="sec-lead">逐个拆开看：每个工具做了哪些关键的交互决策，这些决策在五把尺子上得分如何，以及——如果我是它的交互设计师，我会开什么处方。</p>
+    <article class="tool" id="t1">
+      <div class="tool-head"><span class="tool-no">工具 01</span><h3>Xcode Device Hub</h3><span class="tool-tag">B · 独立设备中枢</span></div>
+      <p class="verdict">「渐进披露与就近控制的教科书」</p>
+      <h4>关键交互决策</h4>
+      <ul>
+        <li><b>双模式窗口 = 渐进披露。</b>"瞥一眼验证"与"深度管理设备"是两种密度的任务，Device Hub 分别给了两种密度的界面——紧凑窗与扩展窗——而不是用一个中间态互相妥协。多数工具失败在后者。</li>
+        <li><b>Inspector 挨着画布 = 就近控制。</b>深色模式、字号、对比度的开关紧贴设备屏幕：切换 → 眼睛无需移动即可看到效果。对比 Android Studio 的 Extended Controls 模态弹窗：调参数、关弹窗、再看设备——反馈回路被人为拉长了一截。</li>
+        <li><b>Resize Mode 吸附 = 约束式输入。</b>自由拖拽给足直接操纵的自由度，吸附到最近有效尺寸防住无效状态。自由与安全兼得，这是直接操纵设计的标准解法。</li>
+        <li><b>Sidebar 只显示用过的设备 = 克制的默认值。</b>默认视图不为"全集"负责，清单的长度由用户的行为史决定，而不是由产品经理的功能欲决定。</li>
+        <li><b>UI / devicectl / MCP 三入口同构 = 为多种交互风格设计同一能力。</b>人用图形界面、脚本用 CLI、AI 代理用 MCP——同一个设备能力，三种身体。这是"能力与界面分离"的范式级设计。</li>
+      </ul>
+      <div class="scores">
+        <div class="sb"><span class="n">反馈回路</span><div class="tk"><div class="fl" style="width:70%"></div></div><span class="v">3.5</span></div>
+        <div class="sb"><span class="n">注意力</span><div class="tk"><div class="fl" style="width:80%"></div></div><span class="v">4.0</span></div>
+        <div class="sb hot"><span class="n">直接操纵</span><div class="tk"><div class="fl" style="width:100%"></div></div><span class="v">5.0</span></div>
+        <div class="sb hot"><span class="n">心智模型</span><div class="tk"><div class="fl" style="width:100%"></div></div><span class="v">5.0</span></div>
+        <div class="sb"><span class="n">低认知负荷</span><div class="tk"><div class="fl" style="width:80%"></div></div><span class="v">4.0</span></div>
+      </div>
+      <div class="duo">
+        <div class="pane good"><h5>✓ 体验优势</h5><ul><li>两种任务密度两种界面，互不妥协</li><li>控制与反馈同屏，回路无断点</li><li>"设备工作区"隐喻完整：清单—画布—检查器正好对应名词—动词—属性</li></ul></div>
+        <div class="pane bad"><h5>✗ 体验代价</h5><ul><li>多窗口把"注意力编排"的责任转嫁给用户和操作系统</li><li>13/14 寸小屏上多窗互挡</li><li>迁移期交互债务：十几年肌肉记忆全部作废重来</li></ul></div>
+      </div>
+      <div class="rx"><b>处方：</b>给多窗口加"工作区预设"（一键保存/恢复整套窗口布局，如"折叠屏+平板+手机"编组）——把空间编排从用户的责任变成工具的责任。这是它自己在吸收 iOS 台前调度的现成解法。</div>
+    </article>
+
+    <article class="tool" id="t2">
+      <div class="tool-head"><span class="tool-no">工具 02</span><h3>Android Studio 模拟器</h3><span class="tool-tag">A · OS 虚拟化 · 嵌入工具窗</span></div>
+      <p class="verdict">「嵌入的初衷，与嵌入的反噬」</p>
+      <h4>关键交互决策</h4>
+      <ul>
+        <li><b>嵌入工具窗 = 把设备放进主视野。</b>初衷是消灭窗口切换、保住编码心流。但 IDE 的像素是稀缺资源：代码、日志、Profiler、设备四方争地——<b>嵌入的前提是内容够小，而模拟器的内容（一整块屏幕）天然不小</b>。平板形态在嵌入模式下几乎不可用，是空间预算破产的直接证据。</li>
+        <li><b>Display Mode 下拉 = 离散的间接操纵。</b>一键换形态优于多开 AVD（好的减法），但"下拉选择"让用户操作的是菜单而不是设备本身——对比 Device Hub 直接拖拽屏幕边缘，间接性差了一个量级。</li>
+        <li><b>双击空白自动贴合 = 微交互层面的补救。</b>用一次双击消除设备四周的浪费空间——这个 2026 年才出现的细节，恰好证明了默认布局的浪费一直存在且一直被容忍。</li>
+        <li><b>Extended Controls 模态弹窗 = 控制与反馈分离。</b>网络、电池、GPS 的参数在弹窗里设置，结果要在弹窗外观察——经典的空间性失误（spatial locality violation）。</li>
+        <li><b>Quick Boot 快照 = 等待问题的正解。</b>不是让等待变快，而是让等待消失——把"等"变成"不用等"。</li>
+      </ul>
+      <div class="scores">
+        <div class="sb"><span class="n">反馈回路</span><div class="tk"><div class="fl" style="width:40%"></div></div><span class="v">2.0</span></div>
+        <div class="sb"><span class="n">注意力</span><div class="tk"><div class="fl" style="width:60%"></div></div><span class="v">3.0</span></div>
+        <div class="sb"><span class="n">直接操纵</span><div class="tk"><div class="fl" style="width:60%"></div></div><span class="v">3.0</span></div>
+        <div class="sb"><span class="n">心智模型</span><div class="tk"><div class="fl" style="width:60%"></div></div><span class="v">3.0</span></div>
+        <div class="sb"><span class="n">低认知负荷</span><div class="tk"><div class="fl" style="width:40%"></div></div><span class="v">2.0</span></div>
+      </div>
+      <div class="duo">
+        <div class="pane good"><h5>✓ 体验优势</h5><ul><li>设备与代码同屏，构建等待期间无需换窗口</li><li>Resizable 一台覆盖多形态，避免"为测尺寸养一窝虚拟机"</li><li>快照体系把冷启动从分钟级拉回秒级</li></ul></div>
+        <div class="pane bad"><h5>✗ 体验代价</h5><ul><li>首次成功时刻（TTFP）过长：装镜像、配虚拟化、开 VT-x，新手在看到第一帧画面之前就要放弃三次</li><li>停靠/浮动/窗口三态模式密度高，模式错误频发</li><li>构建等待期注意力空转：Gradle 在跑，人只能刷手机</li></ul></div>
+      </div>
+      <div class="rx"><b>处方：</b>把"构建中"的等待时间变成设备侧的准备工作——构建期间预启动模拟器、预装上一版本、预取日志。让构建完成的那一瞬间，结果已经在屏幕上。<b>等待要么消灭，要么对齐（让等待时间替用户干活）。</b></div>
+    </article>
+
+    <article class="tool" id="t3">
+      <div class="tool-head"><span class="tool-no">工具 03</span><h3>DevEco Studio 桌面版</h3><span class="tool-tag">A + E · 四层模拟体系</span></div>
+      <p class="verdict">「分层置信度是对的，层间摩擦是痛的」</p>
+      <h4>关键交互决策</h4>
+      <ul>
+        <li><b>四层体系 = 按任务分层置信度。</b>改样式用 Previewer（秒级）、验逻辑用本地模拟器（分钟级）、测多形态用远程（零本地资源）——分层逻辑正确。但每层是不同的界面、不同的交互模型、不同的能力边界，<b>层与层之间的切换本身就是认知成本</b>。用户要先学会"我现在该在哪一层"，这是心智模型税。</li>
+        <li><b>场景化数据注入 = 情境扮演，教科书级。</b>低电量、GPS 导航、户外跑步——把抽象的参数注入包装成生活情境叙事。这是"为场景设计而非为参数设计"的正面教材，值得全行业抄。</li>
+        <li><b>多屏模拟的二元开关 = 空间编排的模式互斥。</b>"整体拖动缩放"与"每副屏独立窗口"两种编排方式互斥切换——而真实需求是组合的：两台靠在一起比、一台甩到副屏单独看。</li>
+        <li><b>launchType = multiton = 配置外化，反面教材。</b>"多设备同时运行应用"本应是一个界面开关，却要求用户先去改 module.json5 再重启工程——<b>把交互设计问题推给了配置管理</b>。用户在配置文件里做的每一个本该在界面上做的决定，都是设计债务的外化。</li>
+      </ul>
+      <div class="scores">
+        <div class="sb"><span class="n">反馈回路</span><div class="tk"><div class="fl" style="width:60%"></div></div><span class="v">3.0*</span></div>
+        <div class="sb"><span class="n">注意力</span><div class="tk"><div class="fl" style="width:60%"></div></div><span class="v">3.0</span></div>
+        <div class="sb"><span class="n">直接操纵</span><div class="tk"><div class="fl" style="width:60%"></div></div><span class="v">3.0</span></div>
+        <div class="sb"><span class="n">心智模型</span><div class="tk"><div class="fl" style="width:50%"></div></div><span class="v">2.5</span></div>
+        <div class="sb"><span class="n">低认知负荷</span><div class="tk"><div class="fl" style="width:50%"></div></div><span class="v">2.5</span></div>
+      </div>
+      <div class="callout" style="font-size:12.5px">* 反馈回路评分严重分层：Previewer 单独可达 4.5（热重载业界标杆），本地模拟器仅 2.0（冷启动 + 高资源占用）——同一个产品里同时存在最好和最普通的回路，用户在层间跌落。</div>
+      <div class="duo">
+        <div class="pane good"><h5>✓ 体验优势</h5><ul><li>Previewer 秒级热重载 + 双向预览（点组件跳代码、点代码亮组件）是"回路+定位"的双料标杆</li><li>场景注入把测试参数翻译成人话</li><li>多屏模拟用一台实例的资源喂四个屏幕，资源心智友好</li></ul></div>
+        <div class="pane bad"><h5>✗ 体验代价</h5><ul><li>四层 = 四套交互模型，切换即税</li><li>多屏模式二元互斥，编排不自由</li><li>远程模拟器 2 小时时限：心流中途被租约打断</li></ul></div>
+      </div>
+      <div class="rx"><b>处方：</b>① 多屏"整体/独立"改为<b>每块屏可单独拖出、拖回时自动磁吸归队</b>（渐进披露的空间版）；② multiton 变成设备面板上的一键开关，并就地说明原因——<b>界面上能做的决定永远不该去配置文件里做</b>。</div>
+    </article>
+    <article class="tool" id="t4">
+      <div class="tool-head"><span class="tool-no">工具 04</span><h3>鸿蒙电脑 DevEco Studio 公测版</h3><span class="tool-tag">C · 原生执行 + 形态窗口</span></div>
+      <p class="verdict">「反馈回路的极限，与散装的窗口」</p>
+      <h4>关键交互决策</h4>
+      <ul>
+        <li><b>原生执行 = 消灭等待本身。</b>没有镜像下载、没有虚拟化配置、没有冷启动——首次成功时刻（TTFP）被压到理论极限："装完 IDE 即可跑"。<b>在"上手体验"这个维度上，它是不需要设计的满分</b>，因为障碍本身不存在了。</li>
+        <li><b>多窗口同步刷新 = 镜像反馈。</b>一次代码修改，N 个形态窗口同时响应——验证行为从"串行轮询"（切一台看一台）变成"并行扫视"（一眼看全部）。这是"一次输入、多处反馈"模式在 IDE 语境下的正确移植。</li>
+        <li><b>形态切换 = 同一画布的模式切换。</b>手机/平板/折叠屏一键切换，交互成本一次点击——比"另开一台模拟器"便宜两个数量级。</li>
+      </ul>
+      <div class="scores">
+        <div class="sb hot"><span class="n">反馈回路</span><div class="tk"><div class="fl" style="width:100%"></div></div><span class="v">5.0</span></div>
+        <div class="sb"><span class="n">注意力</span><div class="tk"><div class="fl" style="width:70%"></div></div><span class="v">3.5</span></div>
+        <div class="sb"><span class="n">直接操纵</span><div class="tk"><div class="fl" style="width:60%"></div></div><span class="v">3.0</span></div>
+        <div class="sb"><span class="n">心智模型</span><div class="tk"><div class="fl" style="width:80%"></div></div><span class="v">4.0</span></div>
+        <div class="sb hot"><span class="n">低认知负荷</span><div class="tk"><div class="fl" style="width:100%"></div></div><span class="v">5.0</span></div>
+      </div>
+      <div class="duo">
+        <div class="pane good"><h5>✓ 体验优势</h5><ul><li>反馈回路全场最快（与 Previewer 热重载并列），且是全保真回路</li><li>零安装零配置：上手没有"第一次挫败"</li><li>形态切换便宜，多窗口同步刷新是正确方向</li></ul></div>
+        <div class="pane bad"><h5>✗ 体验代价</h5><ul><li><b>窗口是散装的</b>：没有清单、没有画布、没有环境面板——空间编排责任全部转嫁给用户的手（与 Android Studio 转嫁给 IDE 正好是相反方向的转嫁）</li><li>环境变量（深色/字号/无障碍）无快捷面板，组合验证要走深度路径</li><li>输入模型错配：键鼠之"看"保真、"摸"不保真——触控热区、手势、多点触控无从验证</li></ul></div>
+      </div>
+      <div class="rx"><b>处方：</b>优先级排序极其清晰——① 把散窗口收编为<b>带清单的画布</b>（最大痛点，且已有素材）；② 环境变量上 Inspector 面板；③ 用"触控热区可视化"（在形态窗口上叠加显示 ≥48vp 热区）部分弥补"摸不到"的缺口——把无法模拟的交互，变成可以检查的图形。</div>
+    </article>
+
+    <article class="tool" id="t5">
+      <div class="tool-head"><span class="tool-no">工具 05</span><h3>Claude Code / Codex</h3><span class="tool-tag">F · 代理驱动验证</span></div>
+      <p class="verdict">「验证的默认化，与控制感的让渡」</p>
+      <h4>关键交互决策</h4>
+      <ul>
+        <li><b>自动验证 = 默认值设计的极致。</b>验证从"用户请求的动作"变成"无需请求的背景服务"——交互成本趋近于零。<b>回路还在，但用户不在回路上</b>：这是反馈回路设计 currently known 的终极形态。</li>
+        <li><b>Codex"点哪改哪" = 就地标注。</b>在渲染结果上直接圈点评论（点标题说"缩小字体"）——把"描述哪里错了"的翻译成本整个消灭。用户不必说"右上角第三个按钮"，直接点它。这是对"指称问题"（reference problem）的界面级解法。</li>
+        <li><b>敏感操作暂停交还 = 信任交接点设计。</b>CAPTCHA、支付、注册交还人类，其余自动化——人机分工的边界画在<b>高风险低频</b>处，不打断高频流。这是自动化产品最重要的一条信任设计规则。</li>
+        <li><b>独立光标 = 空间共存。</b>代理与用户同屏不同标、不抢输入设备——多智能体协作的"身体语言学"：让并行工作在物理上可见且互不侵犯。</li>
+      </ul>
+      <div class="scores">
+        <div class="sb hot"><span class="n">反馈回路</span><div class="tk"><div class="fl" style="width:100%"></div></div><span class="v">5.0</span></div>
+        <div class="sb hot"><span class="n">注意力</span><div class="tk"><div class="fl" style="width:100%"></div></div><span class="v">5.0</span></div>
+        <div class="sb"><span class="n">直接操纵</span><div class="tk"><div class="fl" style="width:80%"></div></div><span class="v">4.0</span></div>
+        <div class="sb"><span class="n">心智模型</span><div class="tk"><div class="fl" style="width:70%"></div></div><span class="v">3.5</span></div>
+        <div class="sb"><span class="n">低认知负荷</span><div class="tk"><div class="fl" style="width:60%"></div></div><span class="v">3.0</span></div>
+      </div>
+      <div class="duo">
+        <div class="pane good"><h5>✓ 体验优势</h5><ul><li>验证零请求、零等待、零打断——三项全免</li><li>就地标注消灭"指称翻译"成本</li><li>后台并行：验证吞吐第一次摆脱人类速度</li></ul></div>
+        <div class="pane bad"><h5>✗ 体验代价</h5><ul><li><b>控制感让渡</b>：代理行为的可预测性不足时，自动化从解放变成焦虑源——"它到底改了什么？为什么认为这样对？"</li><li>验证结果以截图流呈现，信任需要逐次建立</li><li>代理出错时，调试"代理的判断过程"是全新的交互负担</li></ul></div>
+      </div>
+      <div class="rx"><b>处方：</b>给代理行为加"可见性层"——实时显示<b>正在看哪里</b>（注意力可视化）、<b>为什么这么判断</b>（依据链折叠面板）。把黑箱变灰箱，是自动化体验补控制感的唯一路径。</div>
+    </article>
+
+    <article class="tool" id="t6">
+      <div class="tool-head"><span class="tool-no">工具 06</span><h3>微信开发者工具</h3><span class="tool-tag">D · 运行时容器模拟</span></div>
+      <p class="verdict">「情境扮演与版本一键切换的先行者」</p>
+      <h4>关键交互决策</h4>
+      <ul>
+        <li><b>场景值自定义编译 = 入口扮演。</b>模拟"从哪里进来"——分享卡片、搜一搜、扫码、聊天置顶——它模拟的不只是设备，是<b>任务上下文</b>。绝大多数模拟器止步于"模拟一块屏幕"，微信往前想了一层："用户带着什么意图进来"。这是全行业最早的情境化模拟设计。</li>
+        <li><b>基础库版本下拉 = 时间维度一键切换。</b>兼容性验证的交互成本全行业最低：一个下拉框，对比 Android 的多镜像 GB 级下载——<b>同一个问题，交互设计的差距是三个数量级</b>。它证明版本矩阵问题可以靠信息架构而非靠带宽解决。</li>
+        <li><b>切后台按钮 = 生命周期扮演。</b>一秒钟模拟"微信里来电话了"——把不可控的真实打断变成可控的测试变量。</li>
+        <li><b>独立窗口按钮 = 诚实性瑕疵。</b>显示独立、进程耦合：关掉工具，"独立"的模拟器也消失。用户心智中的"独立"与实现不符——<b>隐喻要诚实，是这个案例的反面教材</b>。</li>
+      </ul>
+      <div class="scores">
+        <div class="sb"><span class="n">反馈回路</span><div class="tk"><div class="fl" style="width:90%"></div></div><span class="v">4.5</span></div>
+        <div class="sb"><span class="n">注意力</span><div class="tk"><div class="fl" style="width:80%"></div></div><span class="v">4.0</span></div>
+        <div class="sb"><span class="n">直接操纵</span><div class="tk"><div class="fl" style="width:60%"></div></div><span class="v">3.0</span></div>
+        <div class="sb"><span class="n">心智模型</span><div class="tk"><div class="fl" style="width:80%"></div></div><span class="v">4.0</span></div>
+        <div class="sb"><span class="n">低认知负荷</span><div class="tk"><div class="fl" style="width:70%"></div></div><span class="v">3.5</span></div>
+      </div>
+      <div class="duo">
+        <div class="pane good"><h5>✓ 体验优势</h5><ul><li>秒开、轻量、调试器同进程无缝</li><li>版本兼容验证成本全球最低</li><li>场景值扮演入口上下文，想得比同行深一层</li></ul></div>
+        <div class="pane bad"><h5>✗ 体验代价</h5><ul><li>单实例串行验证：多机型适配靠逐个切换，注意力来回搬运</li><li>保真度需要持续口头沟通——"以真机为准"成为文档口头禅，本身就是信任缺口的自我招认</li><li>硬件能力（摄像头/蓝牙/NFC）仅 mock，验证置信度低</li></ul></div>
+      </div>
+      <div class="rx"><b>处方：</b>① 多机型并排（哪怕先做静态截图墙）；② 把"以真机为准"的判断<b>内建进工具</b>——模拟与真机渲染 diff 自动提示差异点，而不是靠人肉牢记一条免责声明。</div>
+    </article>
+    <div class="pull">六个工具看完，一个模式浮出水面：<b>所有体验失败都有一个共同结构——某项本该由工具承担的责任，被转嫁给了用户</b>（Android Studio 转嫁给 IDE 布局、DevEco 转嫁给配置文件、公测版转嫁给用户的手、微信转嫁给文档提醒）。而所有体验成功也共享一个结构——<b>回路更短、控制更近、默认更聪明</b>。    </div>
+  </section>
+
+  <!-- ============ 五问再答 ============ -->
+  <section class="sec" id="qa">
+    <span class="sec-no">05</span>
+    <h2>五问再答：交互设计师的版本</h2>
+    <p class="sec-lead">同样的五个问题，换设计视角重新回答。结论与工程视角的差异之处，均已显式标出。</p>
+
+    <div class="qa" id="q1">
+      <span class="qtag">问题 1</span>
+      <p class="q">每一种模拟器形式的优劣势分别是什么？相比较之下哪一种更优？</p>
+      <p class="a-label">交互视角作答</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>形态 / 维度</th><th>反馈回路</th><th>注意力</th><th>直接操纵</th><th>心智模型</th><th>低认知负荷</th></tr></thead>
+          <tbody>
+            <tr><td><b>A</b> 虚拟化（Android Studio 等）</td><td><span class="dots">●●○<i>○○</i></span></td><td><span class="dots">●●●<i>○○</i></span></td><td><span class="dots">●●●<i>○○</i></span></td><td><span class="dots">●●●<i>○○</i></span></td><td><span class="dots">●●<i>○○○</i></span></td></tr>
+            <tr><td><b>B</b> 设备中枢（Device Hub）</td><td><span class="dots">●●●●<i>○</i></span></td><td><span class="dots">●●●●<i>○</i></span></td><td><span class="dots">●●●●●</span></td><td><span class="dots">●●●●●</span></td><td><span class="dots">●●●●<i>○</i></span></td></tr>
+            <tr><td><b>C</b> 原生执行（鸿蒙电脑公测版）</td><td><span class="dots">●●●●●</span></td><td><span class="dots">●●●●<i>○</i></span></td><td><span class="dots">●●●<i>○○</i></span></td><td><span class="dots">●●●●<i>○</i></span></td><td><span class="dots">●●●●●</span></td></tr>
+            <tr><td><b>D</b> 容器模拟（微信）</td><td><span class="dots">●●●●<i>○</i></span></td><td><span class="dots">●●●●<i>○</i></span></td><td><span class="dots">●●●<i>○○</i></span></td><td><span class="dots">●●●●<i>○</i></span></td><td><span class="dots">●●●●<i>○</i></span></td></tr>
+            <tr><td><b>E</b> 视口模拟（DevTools / Polypane）</td><td><span class="dots">●●●●●</span></td><td><span class="dots">●●●●<i>○</i></span></td><td><span class="dots">●●●●<i>○</i></span></td><td><span class="dots">●●●<i>○○</i></span></td><td><span class="dots">●●●●●</span></td></tr>
+            <tr><td><b>F</b> 代理驱动（Claude Code 等）</td><td><span class="dots">●●●●●</span></td><td><span class="dots">●●●●●</span></td><td><span class="dots">●●●●<i>○</i></span></td><td><span class="dots">●●●<i>○○</i></span></td><td><span class="dots">●●●<i>○○</i></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>交互设计师的排序：B &gt; C &gt; F &gt; D &gt; E &gt; A。</b></p>
+      <ul>
+        <li><b>B（设备中枢）仍居第一，但理由变了。</b>工程视角的理由是"能力最全"；设计视角的理由是——它是唯一同时满足<b>渐进披露（注意力）、就近控制（直接操纵）、完整工作区隐喻（心智模型）</b>的方案。它输掉的只有反馈回路，而那是构建链路问题，不是交互结构问题。</li>
+        <li><b>C（原生执行）升至第二。</b>反馈回路与认知负荷双满分——体验的两个硬指标它都是天花板。输在直接操纵（形态窗口仍是"窗口"而非"设备"）与注意力的散装编排。</li>
+        <li><b>F（代理驱动）是未来权重最高的形态</b>，但它天生是"寄生形态"——F 的体验上限由它寄生的载体（A/B/C）决定。好的代理体验需要一个好的中枢做身体。</li>
+        <li><b>最刺眼的结论：A（纯虚拟化）在体验维度几乎全面垫底。</b>它的存在理由是覆盖度与置信度（这是工程理由），不是体验。<b>如果只优化体验，永远不要从 A 开始</b>——这正是鸿蒙电脑公测版"零模拟器"路线在设计上的正当性证明。</li>
+      </ul>
+      <div class="callout"><b>与工程视角的分歧点：</b>工程报告认为"B 与 C 并列第一"；设计报告把 B 排在 C 前。原因：C 的两项满分（回路、负荷）是<b>禀赋</b>（宿主即目标 OS），而 B 的均衡是<b>设计</b>（渐进披露、就近控制都是可迁移的交互资产）。禀赋无法复制，设计可以——对绝大多数团队，B 的路径更可学习。</div>
+    </div>
+
+    <div class="qa" id="q2">
+      <span class="qtag">问题 2</span>
+      <p class="q">如果想优化鸿蒙电脑 DevEco Studio 公测版，借鉴哪种模式是最优解？详细说明理由和优化方案。</p>
+      <p class="a-label">交互视角作答</p>
+      <p><b>最优解不变——Device Hub 的交互骨架。但论证路径完全不同：</b></p>
+      <ul>
+        <li><b>它是唯一把"验证"当作完整用户旅程设计的方案。</b>发现设备 → 运行 → 观察 → 调整环境 → 多端比对 → 复现问题——六步一个界面。其他工具都在为其中某一两步设计（Android Studio 优化"运行"、微信优化"复现"），只有 Device Hub 承包了全程。</li>
+        <li><b>它的交互资产与平台无关，可整体迁移。</b>渐进披露、就近控制、约束式输入、镜像反馈、克制的默认值——这些是被验证过的交互模式，不是 Apple 的私有财产。</li>
+        <li><b>公测版的体验短板全部是"结构缺失"型</b>（无清单、无画布、无面板），而 Device Hub 恰好提供了整套信息架构模板——借鉴它的成本是"填充"，不是"重构"。</li>
+      </ul>
+      <h4>优化方案：信息架构 + 交互细节清单</h4>
+      <p>工程报告给出了三层架构；这里补上让它"好用"的交互细节——这些细节决定骨架是家具还是毛坯：</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>交互细节</th><th>设计意图</th></tr></thead>
+          <tbody>
+            <tr><td>设备添加后自动进入画布并磁吸排列</td><td>空间编排是工具的责任；用户永远不该手动"摆齐"第一个设备</td></tr>
+            <tr><td>Resize 拖拽时断点边界实时高亮 + 吸附反馈（微弹动）</td><td>把鸿蒙 sm/md/lg/xl 断点从代码常量变成画布上可见的护栏；吸附的"手感"是约束式输入的可感知层</td></tr>
+            <tr><td>环境变量切换即时生效，无需重新运行</td><td>所见即所得——深色/字号切换若需要重跑，Inspector 就失去了存在的意义</td></tr>
+            <tr><td>多窗同步刷新时对变更区域做短暂高亮闪烁</td><td>并行扫视的最大风险是"看不出哪变了"；闪烁引导视线，消灭扫视噪声</td></tr>
+            <tr><td>形态切换不丢应用状态</td><td>防模式错误：切到平板再切回手机，页面停在原处——形态是视图不是进程</td></tr>
+            <tr><td>碰一碰配对的仪式化反馈（涟漪动画 + 一次信任确认）</td><td>物理动作需要数字回应：碰的瞬间让"连接正在发生"可见，信任确认一次完成</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>交付节奏（按体验收益排序）：</b>① 收编散窗口为"清单 + 画布"（最大痛点的最快解法）；② 环境 Inspector + Resize（组合验证能力）；③ hdctl/MCP（让代理获得身体）。每一步都独立可发布、独立可感知——<b>体验改进的交付也要有渐进披露</b>。</p>
+    </div>
+
+    <div class="qa" id="q3">
+      <span class="qtag">问题 3</span>
+      <p class="q">有哪些鸿蒙特性可以用于优化鸿蒙电脑 DevEco Studio 公测版的模拟器功能？说出详细的优化场景。</p>
+      <p class="a-label">交互视角作答</p>
+      <p>从设计角度，鸿蒙特性的价值不在于"技术可行"，而在于它们能<b>消灭某一类特定的交互成本</b>。按被消灭的成本分类：</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>鸿蒙特性</th><th>消灭的交互成本</th><th>详细场景</th></tr></thead>
+          <tbody>
+            <tr><td><b>碰一碰</b>（NFC 近场）</td><td>流程记忆成本 + 设备指称歧义</td><td>传统配对要记住五步流程，且在 WiFi 设备列表里"选哪台"本身就有歧义。碰一碰把配对压缩为一个物理动作，<b>NFC 的物理接触 = "连的就是它"的零歧义指称</b>，同时近场性天然可视化了对安全的控制（摸得到才连得上）。场景：测试人员拿着出问题的手机碰一下 PC，接入 + 现场（日志/截图/数据容器）一并向中枢报到。</td></tr>
+            <tr><td><b>一多断点体系</b></td><td>抽象概念的脑内换算</td><td>sm/md/lg/xl 是代码里的常量，开发者得在脑内把"840vp"换算成画面。断点可视化画布让边界线直接画在屏幕上、Resize 拖拽时实时高亮当前区间——<b>把抽象护栏物理化</b>。再加断点边界自动探测（扫描工程断点值生成临界尺寸快捷档），一键跳到最容易出问题的边界两侧。</td></tr>
+            <tr><td><b>多屏协同 / 真机镜像</b></td><td>对比验证的记忆成本</td><td>模拟效果与真机效果分屏对比，差异即时暴露——把"以真机为准"从口头禅变成并排可见的事实。配合 PC 键鼠反向操控真机（输入桥接），解决远程复现问题"看得到摸不到"。</td></tr>
+            <tr><td><b>分布式软总线</b></td><td>组网配置成本</td><td>超级终端画成<b>拓扑视图</b>：哪些虚拟形态、哪些真机在网、谁正与谁流转，一目了然。设备关系从命令行参数变成空间图形——分布式调试的心智模型首次有了形状。</td></tr>
+            <tr><td><b>AI 能力</b>（GLM 底座）</td><td>问题定位的指称成本</td><td>AI UI 走查的输出不做成报告列表，而是<b>就地标注</b>在形态窗口截图上（触控目标不足、字号越界直接圈出来）——就近原则应用到质检。bug 复现智能编排：AI 读用户反馈自动还原环境组合，把"环境镜像"从手动拼图变成一键还原。</td></tr>
+            <tr><td><b>方舟运行时</b></td><td>性能失真的判断成本</td><td>性能档位模拟（旗舰/中端/入门）让 PC 强性能不再掩盖低端机问题；运行时版本切换以轻量方式回归旧行为——版本矩阵问题用信息架构解决（微信已证明此路可行）。</td></tr>
+            <tr><td><b>华为账号信任链</b></td><td>高频确认弹窗</td><td>同账号设备免 PIN 直连：<b>信任的静默化</b>——把确认弹窗从高频路径移除，只保留首次。低频确认保护安全，高频确认摧毁心流。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>优先级（按体验杠杆）：</b>断点可视化（成本低/天天用）＞ 碰一碰（差异化记忆点）＞ AI 就地标注 ＞ 真机镜像对比 ＞ 拓扑组网视图 ＞ 性能档位。</p>
+    </div>
+    <div class="qa" id="q4">
+      <span class="qtag">问题 4</span>
+      <p class="q">如果已认定在鸿蒙电脑 DevEco Studio 公测版中将 Device Hub 作为优化方向，合理的理由是什么？哪些功能可以借鉴，哪些功能不必借鉴？</p>
+      <p class="a-label">交互视角作答</p>
+      <h4>合理性：四条设计理由</h4>
+      <ul>
+        <li><b>隐喻成熟度红利。</b>"设备工作区"隐喻已被 Apple 花一年时间教育了市场——全球开发者已经知道"清单 + 画布 + 检查器"怎么用。鸿蒙直接继承这套心智模型，<b>学习成本由别人付过了</b>。选一个用户已经熟悉的模式，永远比发明一个新模式便宜且安全。</li>
+        <li><b>交互资产可复用、风险为零。</b>渐进披露、就近控制、约束式输入都是被千万用户验证过的模式——借鉴它们不是创新冒险，是搬现成的钱。</li>
+        <li><b>信息架构天然可扩展。</b>Sidebar-Canvas-Inspector 三段式对"新形态"是开放的：手表、车机进来只是清单里多一行、画布里多一块——加形态不用改骨架，这是架构对未来的友好。</li>
+        <li><b>公测版的短板全是结构性缺失</b>，B 恰好是完整的结构模板——填充式借鉴，无重构风险。</li>
+      </ul>
+      <h4>借鉴清单（交互层）</h4>
+      <div class="tw">
+        <table>
+          <thead><tr><th>借鉴</th><th>交互设计理由</th></tr></thead>
+          <tbody>
+            <tr><td>紧凑窗 / 扩展窗双模式</td><td>渐进披露——两种任务密度两种界面密度</td></tr>
+            <tr><td>三段式布局（清单/画布/检查器）</td><td>名词—动词—属性的完整工作区隐喻</td></tr>
+            <tr><td>Inspector 就近控制</td><td>控制与反馈同屏，回路无断点</td></tr>
+            <tr><td>Resize 吸附（吸附目标换成鸿蒙断点）</td><td>约束式输入——自由与防错兼得</td></tr>
+            <tr><td>多设备 Tab + 独立窗口</td><td>分组（Tab）与对比（并排）两种组织并存</td></tr>
+            <tr><td>环境镜像复现工作流</td><td>把"无法复现"从沟通问题变成界面操作</td></tr>
+            <tr><td>UI / CLI / MCP 三入口同构</td><td>同一能力服务人、脚本、代理三种身体</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>不必借鉴清单（交互层理由）</h4>
+      <div class="tw">
+        <table>
+          <thead><tr><th>不借鉴</th><th>交互设计理由</th><th>替代做法</th></tr></thead>
+          <tbody>
+            <tr><td>依赖 macOS 窗口文化的多窗编排</td><td>窗口习惯是平台方言，直接移植产生认知翻译成本</td><td>鸿蒙 PC 原生自由窗口 + <b>工作区预设</b>（编组保存/一键恢复）——比原版更进一步</td></tr>
+            <tr><td>PIN + Trust 弹窗配对链路</td><td>五步确认链是信任设计的旧时代产物；高频路径上的每次确认都在摧毁心流</td><td>华为账号信任链 + 碰一碰：信任静默化 + 物理零操作</td></tr>
+            <tr><td>Liquid Glass / visionOS 空间控制</td><td>平台专属语义，迁移后变成无意义的按钮</td><td>换成鸿蒙系统环境变量全集（深色/字号/无障碍/沉浸态）</td></tr>
+            <tr><td>Watch 必须先配 iPhone 的链式配对</td><td>链式依赖的心智模型与超级终端"平等组网"相悖</td><td>直连配对，信任由账号体系继承</td></tr>
+            <tr><td>初期复杂的 Sidebar 过滤/分组</td><td>克制是 Device Hub 清单的灵魂——学功能容易，学克制难</td><td>第一版只显示用过的设备，过滤功能等设备多了再加</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pull">一句话原则：<b>照搬它的结构与工作流，替换它的平台语义，放弃它的实现依赖——并且，在窗口编排上做得比原版更好</b>（工作区预设是原版都没做完的作业）。</div>
+    </div>
+
+    <div class="qa" id="q5">
+      <span class="qtag">问题 5</span>
+      <p class="q">已确定参考 Device Hub 形式，将模拟器作为独立工具，同时提供同屏多设备调试、互相独立的多设备、快捷 UI 调整、画布自由拖动、IP 连接、碰一碰连接——这样做的理由与必要性？</p>
+      <p class="a-label">交互视角作答</p>
+      <p>七项功能覆盖设备工作的四个基本面，构成完整的体验闭环：</p>
+      <div class="loop-grid">
+        <div class="lg c1"><b>形态与入口</b><span>独立工具——注意力容器与角色适配</span></div>
+        <div class="lg c2"><b>多端验证</b><span>同屏多设备 + 独立多实例——感知与隔离</span></div>
+        <div class="lg c3"><b>适配精度</b><span>快捷 UI 调整 + 画布自由拖动——环境与尺寸</span></div>
+        <div class="lg c4"><b>真机接入</b><span>IP 连接 + 碰一碰——无线与零操作</span></div>
+      </div>
+      <h4>逐项交互设计论证</h4>
+      <ul>
+        <li><b>独立工具 = 注意力容器 + 角色适配。</b>验证与管理是重任务，需要完整界面；编码是主任务，需要保护。嵌入的本质是让重任务挤轻任务的空间——空间破产是注定的。独立还有第二重必要性：<b>角色适配</b>——测试、设计不该被迫面对一个 IDE 才能看设备。工具的入口形态决定了谁能用它是设计决策，不是技术决策。</li>
+        <li><b>同屏多设备 = 工作记忆的物理外化。</b>人的工作记忆大约同时持有 4 个组块——逐台切换验证时，上一台设备的布局细节早已被挤出记忆，所谓"对比"实际是记忆幻觉。<b>并排显示把"记忆比较"变成"感知比较"</b>，这是认知科学层面而非效率层面的必要性：不是更快，是只有这种方式才真正构成比较。</li>
+        <li><b>独立多实例 = 归因清晰性。</b>共享状态的"多设备"会造成归因混乱：问题出在这台设备，还是共享的数据？隔离实例让每个验证单元自证清白。同时它给自动化提供了独立句柄——<b>没有隔离，就没有并行</b>（AI 代理同时在 N 台设备上验证的前提是它们互不知晓）。</li>
+        <li><b>快捷 UI 调整 = 深度路径的消灭。</b>组合验证（深色 × 大字 × 窄宽）走系统设置 = 指数次往返。交互设计的第一课：<b>用户不会做的操作，等于不存在的功能</b>。快捷面板让组合测试的发生率从"理论上应该"变成"顺手就会"——这条功能的真正产出不是能力，是行为改变。</li>
+        <li><b>画布自由拖动 = 空间记忆 + 直接操纵。</b>自由布局允许开发者建立空间惯例（"手机永远在左上、参考机缩小靠边"）——<b>空间记忆比列表记忆更持久、检索更快</b>。缩放对应检查粒度：Zoom In 查像素、Zoom to Fit 看全局、1:1 还原真实观感。没有画布，多设备只是"多开几个窗口"；有了画布，才是一个可以被记住、被恢复的空间。</li>
+        <li><b>IP 连接 = 物理约束的移除。</b>USB 口数量物理限制真机矩阵规模；线缆（接触不良、集线器供电）是高频摩擦源。无线的深层价值是<b>设备可以待在真实使用环境里</b>（另一个房间的弱信号角落）被调试——验证环境第一次可以等于使用环境。</li>
+        <li><b>碰一碰 = 物理确定性 + 零学习成本。</b>NFC 近场性消灭指称歧义（碰的就是它，不存在选错设备）；碰一碰作为鸿蒙全民心智（一碰传教育多年）意味着<b>零学习成本的配对</b>；物理动作自带仪式感与确认感——按下即连接，无需在弹窗里寻找"确定"。它是唯一能让新用户不看文档就完成配对的方案。</li>
+      </ul>
+      <div class="callout"><b>必要性的总证明：</b>七项功能各自消灭一类交互成本（窗口切换、记忆比较、归因混乱、深度路径、空间失忆、物理摩擦、流程记忆）——<b>没有任何一项是"锦上添花"，每一项都在拆除一道现存的行为障碍</b>。拆掉全部七道，"多设备验证"才从项目降格为动作——这正是第五把尺子（认知负荷）的达标线。</div>
+    </div>
+  </section>
+
+  <!-- ============ 宣言 ============ -->
+  <section class="sec" id="manifesto">
+    <span class="sec-no">06</span>
+    <h2>结语：模拟器交互设计的十条宣言</h2>
+    <p class="sec-lead">六类工具、五把尺子、五个问题——所有分析收敛为十条可迁移的设计原则。</p>
+    <ol class="creed">
+      <li>验证永远是第一屏任务<small>反馈回路优先于一切功能列表——回路慢一秒，功能清单都是摆设</small></li>
+      <li>让多设备验证成为一个动作，而不是一个项目<small>从"开 N 台模拟器逐个看"到"一眼扫过画布"——这是所有设备中枢存在的唯一理由</small></li>
+      <li>控制项必须挨着它控制的那个东西<small>就近控制：Inspector 贴画布、标注贴截图、开关贴状态——距离就是延迟</small></li>
+      <li>自由操纵必须配约束<small>Resize 要有吸附、拖动要有磁吸、自由要有防错——没有约束的自由制造无效状态</small></li>
+      <li>等待要么消灭，要么对齐<small>消灭（快照/原生执行/热重载）；对齐不了就让等待时间替用户干活（构建期预热设备）</small></li>
+      <li>界面上能做的决定，永远不该去配置文件里做<small>multiton 之诫：每个被外化到配置的交互决定，都是一笔要付利息的设计债</small></li>
+      <li>隐喻要诚实<small>叫"独立窗口"就要真独立；说"以真机为准"就把差异检测内建进工具</small></li>
+      <li>自动化必须配可见性<small>代理要展示它在看哪、为何这么判——黑箱变灰箱，解放才不变成焦虑</small></li>
+      <li>空间编排是工具的责任，不是用户手的义务<small>磁吸、编组、工作区预设——用户负责思考，工具负责摆齐</small></li>
+      <li>物理交互是数字流程的最短路径<small>碰一碰优于五步弹窗——当交互可以借用身体，就不要占用注意力</small></li>
+    </ol>
+    <div class="pull">最后一个判断，留给决策者：<b>鸿蒙电脑公测版已经拿到了别人拿不到的两张牌——零等待的回路（禀赋）与碰一碰的身体（特性）。它缺的只是那副骨架。</b>补上 Device Hub 的骨架，它将成为第一个"体验上不需要向任何模拟器道歉"的开发环境。</div>
+  </section>
+
+  <footer>
+    <span>交互设计视角 · 模拟器体验再分析 · 2026-10-20</span>
+    <span>与《工程视角报告》（index.html）互为补充</span>
+  </footer>
+
+</main>
+</div>
+
+<button class="to-top" id="toTop" title="返回顶部">↑</button>
+
+<script>
+/* 阅读进度 */
+const prog = document.getElementById('progress');
+const toTop = document.getElementById('toTop');
+window.addEventListener('scroll', ()=>{
+  const h = document.documentElement;
+  const p = h.scrollTop / (h.scrollHeight - h.clientHeight);
+  prog.style.width = (p*100)+'%';
+  toTop.classList.toggle('show', h.scrollTop > 600);
+}, {passive:true});
+toTop.addEventListener('click', ()=>window.scrollTo({top:0,behavior:'smooth'}));
+
+/* 目录 + scrollspy */
+const TOC = [
+  {h:'#overview', t:'概览', g:'视角与方法'},
+  {h:'#framework', t:'评估框架：五把尺子', g:'视角与方法'},
+  {h:'#loops', t:'反馈回路对比', g:'视角与方法'},
+  {h:'#attention', t:'注意力光谱', g:'视角与方法'},
+  {h:'#t1', t:'Xcode Device Hub', g:'工具解读', sub:true},
+  {h:'#t2', t:'Android Studio', g:'工具解读', sub:true},
+  {h:'#t3', t:'DevEco Studio 桌面版', g:'工具解读', sub:true},
+  {h:'#t4', t:'鸿蒙电脑公测版', g:'工具解读', sub:true},
+  {h:'#t5', t:'Claude Code / Codex', g:'工具解读', sub:true},
+  {h:'#t6', t:'微信开发者工具', g:'工具解读', sub:true},
+  {h:'#q1', t:'Q1 · 哪种形式更优', g:'五问再答'},
+  {h:'#q2', t:'Q2 · 最优借鉴模式', g:'五问再答'},
+  {h:'#q3', t:'Q3 · 鸿蒙特性场景', g:'五问再答'},
+  {h:'#q4', t:'Q4 · 借鉴与取舍', g:'五问再答'},
+  {h:'#q5', t:'Q5 · 七功能必要性', g:'五问再答'},
+  {h:'#manifesto', t:'十条设计宣言', g:'结语'}
+];
+const tocEl = document.getElementById('toc');
+let lastGroup = '';
+TOC.forEach(item=>{
+  if(item.g !== lastGroup){
+    const h = document.createElement('div');
+    h.className = 'toc-h'; h.textContent = item.g;
+    tocEl.appendChild(h); lastGroup = item.g;
+  }
+  const a = document.createElement('a');
+  a.href = item.h; a.textContent = item.t;
+  if(item.sub) a.classList.add('sub');
+  tocEl.appendChild(a);
+});
+const links = [...tocEl.querySelectorAll('a')];
+const targets = TOC.map(i=>document.querySelector(i.h)).filter(Boolean);
+const spy = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      links.forEach(l=>l.classList.toggle('on', l.getAttribute('href') === '#'+e.target.id));
+    }
+  });
+},{rootMargin:'-15% 0px -75% 0px'});
+targets.forEach(t=>spy.observe(t));
+</script>
+</body>
+</html>
